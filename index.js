@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors')
 const jwt = require('jsonwebtoken');
-require('dotenv').config()
+require('dotenv').config()  //.env ar environment varible kaj koranor jnno aita require kora lagey
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 const port = process.env.PORT || 5000;
@@ -21,7 +21,16 @@ async function run() {
   try {
     //connect to client
     await client.connect();
-    console.log('Connected to MongoDB');
+    // console.log('Connected to MongoDB');
+    const serviceCollection=client.db('doctors_portal').collection('services');
+
+    //get services
+    app.get('/service',async(req,res)=>{
+        const query={};
+        const cursor= serviceCollection.find(query);
+        const services= await cursor.toArray();
+        res.send(services)
+    })
 
 
 
