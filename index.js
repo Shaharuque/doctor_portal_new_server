@@ -18,7 +18,22 @@ app.use(express.json())
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.yz2oh.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
-
+//Jwt token verify jeita client thekey asha token k verify korbo
+function verifyJWT(req, res, next) {
+  const authHeader = req.headers.authorization;
+  //bairey thekey get req korley authHeader thekar proshno e uthey na tai ai case a Unauthorized access boley dibo
+  if (!authHeader) {
+    return res.status(401).send({ message: 'UnAuthorized access' });
+  }
+  const token = authHeader.split(' ')[1];
+  jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, function (err, decoded) {
+    if (err) {
+      return res.status(403).send({ message: 'Forbidden access' })
+    }
+    req.decoded = decoded;
+    next();
+  });
+}
 
 async function run() {
   try {
@@ -38,6 +53,39 @@ async function run() {
     * app.put('/booking/:id) //upsert ===> update(if exist) or insert(if not exist)  //put use kora hoy tokhn e jokhn kono kicho thakteo parey abr nao thaktey parey(spcial)
     * app.delete('/booking/:id) // delete a sepecific booking
    */
+
+    //getting all users
+    //verifyJWT is middleware aita use korley ar outside thekey ai API call korleo data dekhabey na cuz token to ar issue hoy na je user logged in kora thakey na
+    app.get('/users',verifyJWT, async (req, res) => {
+      const users = await userCollection.find({}).toArray();
+      res.send(users);
+    })
+
+
+    //user role jodi admin hoy tahley 'true' return korbey ai api tey client thekey req korley
+    app.get('/admin/:email', async(req, res) =>{
+      const email = req.params.email;
+      const user = await userCollection.findOne({email: email});
+      const isAdmin = user.role === 'admin';
+      res.send({admin: isAdmin})
+    })
+    //userCollection a kono ekta user ar info update(role:'admin' add) 
+    app.put('/user/makeAdmin/:email',verifyJWT,async(req,res)=>{
+      const email = req.params.email;
+      
+      //site a j logged hoisey tar email pawa jay 'req.decoded.email' aitar through tey and 'req.decoded.email' aita access kortey partese bcz of verifyJWT middleware
+      const requesterEmail = req.decoded.email;
+      //userCollection thekey requesterEmail wala user find korbey
+      const requesterAccount = await userCollection.findOne({ email: requesterEmail });
+
+      //aikhney const options={upsert:true} use kora hoy ni cuz user na thakley sheita DB add korbo na tai just user DB tey userCollection a pailey tar role admin korey dissi thats it
+      if(requesterAccount.role==='admin'){
+        const result = await userCollection.updateOne({email},{$set:{role:'admin'}});
+        res.send(result);
+      }else{
+        res.status(403).send({message: 'forbidden'});
+      }
+    })
 
     //User add to mongoDB 
     //each user ar email unique tai sheitar basis a API create hocchey and user k DB tey store kortese(Admin ar kaj korar smy lagbey)
@@ -131,15 +179,25 @@ async function run() {
     })
 
     //getting particular user booking data
-    app.get('/booking',async(req,res)=>{
+    app.get('/booking',verifyJWT,async(req,res)=>{
       const patient_email=req.query.patient_email //client side thekey patient ar data ashbey
-      //filtering ar condition
-      const query={patient_email:patient_email}
-      //finding data
-      const allBookings_ofPatient=await bookingCollection.find(query).toArray();
-      res.send(allBookings_ofPatient)
-    })
+      // const authorization=req.headers.authorization   //authorization ar moddhey bearer+token ashbey client thekey now token verify korbo
+      // console.log(authorization)
 
+      //amr valid access token diye jeno onno joney data access kortey na pari seita thekanor jnno ai condition check
+      const decodedEmail = req.decoded.email;
+      if(decodedEmail===patient_email){
+         //filtering ar condition
+        const query={patient_email:patient_email}
+        //finding data
+        const allBookings_ofPatient=await bookingCollection.find(query).toArray();
+        return res.send(allBookings_ofPatient)
+      }
+      else {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+     
+    })
 
   } finally {
 
