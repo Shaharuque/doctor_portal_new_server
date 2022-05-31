@@ -127,7 +127,7 @@ async function run() {
     // After learning more about mongodb. use aggregate, lookup, pipeline, match, group
     //getting available slots of each service on each date
     app.get('/available', async (req, res) => {
-      const date = req.query.date ;  //date ta query hishabey client side theke ashbey
+      const date = req.query.date ;  //date will come from client side and will be get here using =>req.query.date
       console.log(date)
       // step 1:  get all services
       const services = await serviceCollection.find().toArray();
@@ -140,8 +140,9 @@ async function run() {
       services.forEach(service => {
         // step 4: find bookings for that service. output: [{}, {}, {}, {}]
         const serviceBookings = bookings.filter(book => book.treatment === service.name);
+        
         // step 5: select slots for the service Bookings: ['', '', '', '']
-        const bookedSlots = serviceBookings.map(book => book.slot);
+        const bookedSlots = serviceBookings.map(book => book.slot); //booked service ar selected slot return korey bookedSlots a store kora hoisey
         // step 6: select those slots that are not in bookedSlots
         const available = service.slots.filter(slot => !bookedSlots.includes(slot));
         //step 7: set available to slots to make it easier 
@@ -194,6 +195,26 @@ async function run() {
         return res.send(allBookings_ofPatient)
       }
       else {
+        return res.status(403).send({ message: 'forbidden access' });
+      }
+     
+    })
+    //cancel booking/appointment
+    app.delete('/booking/:id',verifyJWT,async(req,res)=>{
+      const booking_id=req.params.id;
+      const user_email=req.query.user_email
+      //console.log(user_email)
+      if(user_email===req.decoded.email){
+         //filtering ar condition
+         const query={_id:ObjectId(booking_id)}
+         //finding data
+         const deletedBooking=await bookingCollection.deleteOne(query);
+         return res.status(200).send({
+           message:'successfully deleted',
+           deletedBooking:deletedBooking,
+         })
+      }
+      else{
         return res.status(403).send({ message: 'forbidden access' });
       }
      
