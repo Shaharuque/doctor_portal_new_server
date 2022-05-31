@@ -115,6 +115,7 @@ async function run() {
         accessToken: token,
       })
     })
+    //Delete user By admin
 
     //get services API
     app.get('/service', async (req, res) => {
@@ -129,6 +130,7 @@ async function run() {
     app.get('/available', async (req, res) => {
       const date = req.query.date ;  //date will come from client side and will be get here using =>req.query.date
       console.log(date)
+      if(date){
       // step 1:  get all services
       const services = await serviceCollection.find().toArray();
 
@@ -148,7 +150,11 @@ async function run() {
         //step 7: set available to slots to make it easier 
         service.slots  = available;
       });
-
+      res.send(services);
+      }
+      else{
+        res.status(400).send({message:'date is required'})
+      }
      /**
      * API Naming Convention
      * app.get('/booking') // get all bookings in this collection. or get more than one or by filter
@@ -158,7 +164,7 @@ async function run() {
      * app.delete('/booking/:id) // delete a sepecific booking
     */
 
-      res.send(services);
+      
     })
 
     //Task: same user jeno same time a same date a onno treatment ar booking kortey na parey sheitar query
