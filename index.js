@@ -43,6 +43,7 @@ async function run() {
     const serviceCollection = client.db('doctors_portal').collection('services');
     const bookingCollection = client.db('doctors_portal').collection('bookings');
     const userCollection = client.db('doctors_portal').collection('users');
+    const doctorCollection = client.db('doctors_portal').collection('doctors');
 
     /**
     * API Naming Convention
@@ -65,7 +66,7 @@ async function run() {
     //user role jodi admin hoy tahley 'true' return korbey ai api tey client thekey req korley
     app.get('/admin/:email', async(req, res) =>{
       const email = req.params.email;
-      const user = await userCollection.findOne({email: email});
+      const user = await userCollection.findOne({email: email}); //const user = await userCollection.findOne({email: email});=>leftside email is DB tey userCollection ar stored user ar email, ar right side email=>client side thekey j req kora hoisey tar sathey asha email.
       const isAdmin = user.role === 'admin';
       res.send({admin: isAdmin})
     })
@@ -87,7 +88,7 @@ async function run() {
       }
     })
 
-    //User add to mongoDB 
+    //User add to mongoDB userCollection 
     //each user ar email unique tai sheitar basis a API create hocchey and user k DB tey store kortese(Admin ar kaj korar smy lagbey)
     app.put('/user/:email',async(req,res)=>{
       const user_email=req.params.email  //dynamic id ta
@@ -107,7 +108,7 @@ async function run() {
       //now update
       const result = await userCollection.updateOne(filter, updateDoc, options);
       //user ar info DB tey set korar por ekta access token generate korey dibo and sheita client side a pathabey
-      const token=jwt.sign({email:user_email},process.env.ACCESS_TOKEN_SECRET,{expiresIn:'1h'})
+      const token=jwt.sign({email:user_email},process.env.ACCESS_TOKEN_SECRET,{expiresIn:'1d'})
       res.send({
         //user ar email jodi authenticated hoy tokhn e user k token supply dibey otherwise not
         success: true,
@@ -120,7 +121,7 @@ async function run() {
     //get services API
     app.get('/service', async (req, res) => {
       const query = {};
-      const cursor = serviceCollection.find(query);
+      const cursor = serviceCollection.find(query).project({name:1}); //serviceCollection.find(query).project({name:1})=>name:1 means only name field from serviceCollection will be returned
       const services = await cursor.toArray();
       res.send(services)
     })
@@ -225,6 +226,27 @@ async function run() {
       }
      
     })
+
+    //upload doctor info into Db
+    app.post('/doctor',verifyJWT, async (req, res) => {
+      const doctor=req.body;
+      const query={email:doctor.email,image:doctor.image}   //doctor.email,doctor.image ai koyta jinish ar opor builded query ar opor base korey data find kora hobey and shei data jodi DB tey thakey tahley sheita exits a store hobey
+      const exists=await doctorCollection.findOne(query);
+      //doctor jodi DB tey exists thakey tahley ar new doctor kortey dibo na
+      if(exists){
+        return res.send({success:false,doctor:exists})
+      }
+
+      //doctor new holey sheita DB tey add hobey
+      const insertedDoctor=await doctorCollection.insertOne(doctor);
+      if(insertedDoctor){
+        return res.send({success:true,insertedDoctor})
+      }
+      else{
+        return res.send({success:false,message:'doctor not inserted'})
+      }
+    })
+        
 
   } finally {
 
