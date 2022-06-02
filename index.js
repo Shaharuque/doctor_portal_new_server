@@ -3,6 +3,7 @@ const cors = require('cors')
 const jwt = require('jsonwebtoken');
 require('dotenv').config()  //.env ar environment varible kaj koranor jnno aita require kora lagey
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const { status } = require('express/lib/response');
 
 const port = process.env.PORT || 5500;
 const app = express()
@@ -54,6 +55,17 @@ async function run() {
     * app.put('/booking/:id) //upsert ===> update(if exist) or insert(if not exist)  //put use kora hoy tokhn e jokhn kono kicho thakteo parey abr nao thaktey parey(spcial)
     * app.delete('/booking/:id) // delete a sepecific booking
    */
+
+    //verifyAdmin middleware 
+    //loggedin user ar role ki admin kina sheita verify korbey and tar basis a next kaj hobey
+    const verifyAdmin=async(req,res,next)=>{
+      const requester=await userCollection.findOne({email:req.decoded.email})   //here,req.decoded.email=>email of loggedin user
+      if(requester.role!=='admin'){
+        return res.status(403).send({message:'Forbidden access'})
+      }
+      //loggedin/requester ar role admin holey next() call hobey
+      next()
+    }
 
     //getting all users
     //verifyJWT is middleware aita use korley ar outside thekey ai API call korleo data dekhabey na cuz token to ar issue hoy na je user logged in kora thakey na
@@ -116,7 +128,22 @@ async function run() {
         accessToken: token,
       })
     })
-    //Delete user By admin
+    //Delete user By admin with the help of user id[But remember admin can;t remove another admin so i need to check wheather requested id to be deleted is admin or not]
+    app.delete('/user/:id',verifyJWT,async(req,res)=>{
+      const id=req.params.id                  //client side thekey req ar sathey asha email jakey delete kortey chai
+      const userToBeDelete=await userCollection.findOne({_id:ObjectId(id)})  //client side thekey req ar sathey asha email jakey delete kortey chai tar info DB tey find korey userToBeDelete a set korbo
+      //console.log(userToBeDelete)
+      const requesterEmail = req.decoded.email;    //loggedin user ar email
+      const requesterAccount = await userCollection.findOne({ email: requesterEmail });
+
+      if(requesterAccount.role==='admin' && userToBeDelete.role!=='admin'){
+        const result = await userCollection.deleteOne({_id:ObjectId(id)});   //id niye kaj kortey chailey aivabey kaj kortey hoy
+        res.status(200).send({result:result,
+          message:'user deleted'});
+      }else{
+        res.status(403).send({message: 'forbidden'});
+      }
+    })
 
     //get services API
     app.get('/service', async (req, res) => {
@@ -228,25 +255,53 @@ async function run() {
     })
 
     //upload doctor info into Db
-    app.post('/doctor',verifyJWT, async (req, res) => {
+    //multiple middleware can be used ,verifyJWT ar por verifyAdmin true holei new doctor DB tey add kora jabey otherwise 403 forbidden
+    //verifadmin middleware will prevent outside user to add doctor info
+    app.post('/doctor',verifyJWT,verifyAdmin, async (req, res) => {
       const doctor=req.body;
-      const query={email:doctor.email,image:doctor.image}   //doctor.email,doctor.image ai koyta jinish ar opor builded query ar opor base korey data find kora hobey and shei data jodi DB tey thakey tahley sheita exits a store hobey
+      const query={email:doctor.email}   //doctor.email ai jinish ar opor builded query ar opor base korey data find kora hobey and shei data jodi DB tey thakey tahley sheita exits a store hobey//means client side thekey asha reqested email jodi doctorCollection a already stored thakey tahley ar new doctor add ar req accept hobey na rejected hobey
       const exists=await doctorCollection.findOne(query);
       //doctor jodi DB tey exists thakey tahley ar new doctor kortey dibo na
       if(exists){
         return res.send({success:false,doctor:exists})
       }
-
-      //doctor new holey sheita DB tey add hobey
-      const insertedDoctor=await doctorCollection.insertOne(doctor);
-      if(insertedDoctor){
-        return res.send({success:true,insertedDoctor})
-      }
       else{
-        return res.send({success:false,message:'doctor not inserted'})
+         //doctor new holey sheita DB tey add hobey
+        const insertedDoctor=await doctorCollection.insertOne(doctor);
+        if(insertedDoctor){
+          return res.send({success:true,insertedDoctor})
+        }
+        else{
+          return res.send({success:false,message:'doctor not inserted As he is already inserted once'})
+        }
       }
     })
-        
+
+    //get all doctor's data
+    app.get('/doctor',verifyJWT,verifyAdmin,async(req,res)=>{
+      const allDoctors=await doctorCollection.find().toArray();
+      return res.send(allDoctors)
+    })
+
+    //remove doctor
+    app.delete('/doctor/:id',verifyJWT,verifyAdmin,async(req,res)=>{
+      const doctor_id=req.params.id;
+      //console.log(doctor_id)
+      const query={_id:ObjectId(doctor_id)}
+      const deletedDoctor=await doctorCollection.deleteOne(query);
+      if(deletedDoctor){
+        return res.send({
+          status:200,
+          message:'successfully deleted',
+        })
+      }
+      else{
+        return res.send({
+          status:400,
+          message:'doctor not deleted',
+        })
+      }
+    })
 
   } finally {
 
