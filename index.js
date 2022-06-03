@@ -1,9 +1,12 @@
 const express = require('express');
 const cors = require('cors')
 const jwt = require('jsonwebtoken');
+//email pathanor jnno
+const nodemailer = require('nodemailer');
+const mg = require('nodemailer-mailgun-transport');
 require('dotenv').config()  //.env ar environment varible kaj koranor jnno aita require kora lagey
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
-const { status } = require('express/lib/response');
+
 
 const port = process.env.PORT || 5500;
 const app = express()
@@ -191,9 +194,9 @@ async function run() {
      * app.patch('/booking/:id) //update a specific booking
      * app.delete('/booking/:id) // delete a sepecific booking
     */
-
-      
     })
+
+
 
     //Task: same user jeno same time a same date a onno treatment ar booking kortey na parey sheitar query
     //patient booking info post to DB API
