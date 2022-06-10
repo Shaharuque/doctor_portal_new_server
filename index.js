@@ -6,6 +6,8 @@ const nodemailer = require('nodemailer');
 const mg = require('nodemailer-mailgun-transport');
 require('dotenv').config()  //.env ar environment varible kaj koranor jnno aita require kora lagey
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+//for stripe
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 
 const port = process.env.PORT || 5500;
@@ -87,16 +89,16 @@ async function run() {
     })
     //userCollection a kono ekta user ar info update(role:'admin' add) 
     app.put('/user/makeAdmin/:email',verifyJWT,async(req,res)=>{
-      const email = req.params.email;
+      const email = req.params.email;      //client side thekey asha email
       
-      //site a j logged hoisey tar email pawa jay 'req.decoded.email' aitar through tey and 'req.decoded.email' aita access kortey partese bcz of verifyJWT middleware
+      //site a j logged in hoisey tar email pawa jay 'req.decoded.email' aitar through tey and 'req.decoded.email' aita access kortey partese bcz of verifyJWT middleware
       const requesterEmail = req.decoded.email;
       //userCollection thekey requesterEmail wala user find korbey
       const requesterAccount = await userCollection.findOne({ email: requesterEmail });
 
       //aikhney const options={upsert:true} use kora hoy ni cuz user na thakley sheita DB add korbo na tai just user DB tey userCollection a pailey tar role admin korey dissi thats it
       if(requesterAccount.role==='admin'){
-        const result = await userCollection.updateOne({email},{$set:{role:'admin'}});
+        const result = await userCollection.updateOne({email},{$set:{role:'admin'}});        //email=>client side thekey j req kora hoisey tar sathey asha email ar user find korey tar role admin korey dewa holo
         res.send(result);
       }else{
         res.status(403).send({message: 'forbidden'});
@@ -236,6 +238,23 @@ async function run() {
       }
      
     })
+    //get booking in by its id,verifyJWT middletire/middleware call howar karoney ar outside thekey ai api call korleo data pabey na cuz that call will not have any token
+    app.get('/booking/:id',verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const booking = await bookingCollection.findOne({ _id: ObjectId(id) });
+      if(booking){
+        res.status(200).send({
+          booking: booking,
+          message: 'booking found'
+        });
+      }
+      else{
+        res.status(404).send({
+          message: 'booking not found'
+        });
+      }
+    })
+
     //cancel booking/appointment
     app.delete('/booking/:id',verifyJWT,async(req,res)=>{
       const booking_id=req.params.id;
